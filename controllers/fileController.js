@@ -10,11 +10,8 @@ const upload = multer({ dest: "uploads/" });
 class FileController {
   async upload(req, res, next) {
     try {
-      console.log(req.body);
-
       const { userId } = req.body;
       const { filename } = req.files;
-      console.log("req.file=>", filename.name);
 
       let fileOriginName = uuid.v4() + filename.name.split(".").pop();
       filename.mv(path.resolve(__dirname, "..", "static", fileOriginName));
@@ -26,7 +23,7 @@ class FileController {
         mime_type: filename.mimetype,
         size: filename.size,
       });
-      return res.json({ message: "Файл успешно сохранен" }, file);
+      return res.json({ message: "Файл успешно сохранен" });
     } catch (e) {
       next(ApiError.badRequest(e.message));
     }
@@ -44,12 +41,9 @@ class FileController {
     }
   }
   async delete(req, res, next) {
-    console.log("im here");
     try {
       const { id } = req.params;
 
-      console.log(req.params);
-      console.log("id=>", id);
       const file = await File.findOne({ where: { id } });
       if (!file) {
         next(ApiError.badRequest("Файл не найден"));
@@ -75,7 +69,7 @@ class FileController {
       if (!file) {
         next(ApiError.badRequest("Файл не найден"));
       }
-      return res.json({ message: "Вот Ваш файл" }, file);
+      return res.json({ message: "Вот Ваш файл", file });
     } catch (e) {
       next(ApiError.badRequest(e.message));
     }
@@ -99,17 +93,29 @@ class FileController {
   async update(req, res, next) {
     try {
       const { id } = req.params;
-      const { userId, filename, mime_type, size } = req.file;
+      const { userId } = req.body;
+      const { filename } = req.files;
+      console.log(filename);
       const file = await File.findOne({ where: { id } });
       if (!file) {
         next(ApiError.badRequest("Файл не найден"));
       }
+      const filePath = path.resolve(__dirname, "..", "static", file.filename);
+      fs.unlink(filePath, (err) => {
+        if (err) {
+          return next(
+            ApiError.internal({ message: "Ошибка при удалении файла" })
+          );
+        }
+      });
+      let fileOriginName = uuid.v4() + filename.name.split(".").pop();
+      filename.mv(path.resolve(__dirname, "..", "static", fileOriginName));
 
       file.userId = userId;
-      file.filename = filename;
-      file.extension = filename.split(".").pop();
-      file.mime_type = mime_type;
-      file.size = size;
+      file.filename = fileOriginName;
+      file.extension = filename.name.split(".").pop();
+      file.mime_type = filename.mimetype;
+      file.size = filename.size;
       await file.save();
 
       return res.json({ message: "Файл успешно обновлен" }, file);
